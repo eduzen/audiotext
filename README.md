@@ -70,8 +70,11 @@ set `ALLOWED_TELEGRAM_USER_IDS` to a comma-separated list of trusted Telegram
 user IDs. This restricts who can submit audio; it doesn’t change access to
 existing private transcript history.
 
-On startup, the bot updates Telegram’s `/` menu with `/start` and `/help`, plus
-`/my_audio` and `/delete_audio` in private chats. If old commands remain after
+Use `/contribute` to get the [AudioText GitHub repository](https://github.com/eduzen/audiotext/)
+link and report a bug, suggest a feature, or open a pull request.
+
+On startup, the bot updates Telegram’s `/` menu with `/start`, `/help`, and
+`/contribute`, plus `/my_audio` and `/delete_audio` in private chats. If old commands remain after
 restarting the bot and reopening the chat, check for previously configured
 chat-specific or language-specific command lists. Telegram may show those
 instead of the menus the bot updates.

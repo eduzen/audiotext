@@ -135,8 +135,8 @@ class CommandMenuTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             telegram.command_menus,
             {
-                "default": ["start", "help"],
-                "all_private_chats": ["start", "help", "my_audio", "delete_audio"],
+                "default": ["start", "help", "contribute"],
+                "all_private_chats": ["start", "help", "contribute", "my_audio", "delete_audio"],
             },
         )
 
@@ -306,7 +306,7 @@ class AudioAdmissionIntegrationTest(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual(telegram.replies[-1], "Transcript")
 
 
-class HistoryIntegrationTest(unittest.IsolatedAsyncioTestCase):
+class CommandIntegrationTest(unittest.IsolatedAsyncioTestCase):
     async def command(
         self,
         application: Application,
@@ -341,6 +341,18 @@ class HistoryIntegrationTest(unittest.IsolatedAsyncioTestCase):
             return ""
         self.assertEqual(len(telegram.replies), message_id)
         return telegram.replies[-1]
+
+    async def test_contribute_shares_github_link_in_private_and_group_chats(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            telegram = FakeTelegram()
+            with patch("audiotext.bot.Transcriber.from_settings"):
+                application = build_application(_settings_for(Path(directory)), request=telegram)
+
+            async with application:
+                for chat in (CHAT, GROUP_CHAT):
+                    with self.subTest(chat=chat):
+                        reply = await self.command(application, telegram, "/contribute", chat=chat)
+                        self.assertIn("https://github.com/eduzen/audiotext/", reply)
 
     async def test_users_records_owner_on_first_use(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

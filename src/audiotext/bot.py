@@ -134,7 +134,16 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
             "Supported audio includes MP3, M4A, WAV, FLAC, OGG/Opus, AAC, "
             "WebM, and WMA. The current upload limit is "
             f"{settings.max_upload_mb} MB. In private chat, use /my_audio to see your "
-            "history or /delete_audio ID to remove a saved transcript."
+            "history or /delete_audio ID to remove a saved transcript. "
+            "Use /contribute to help improve AudioText."
+        )
+
+
+async def contribute(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
+    if update.message:
+        await update.message.reply_text(
+            "Want to help improve AudioText? Report a bug, suggest a feature, or open a pull "
+            "request on GitHub:\nhttps://github.com/eduzen/audiotext/"
         )
 
 
@@ -344,6 +353,7 @@ async def _sync_command_menu(application: Application) -> None:
     default_commands = [
         BotCommand("start", "Learn how to transcribe audio"),
         BotCommand("help", "See supported formats and upload limits"),
+        BotCommand("contribute", "Contribute to AudioText on GitHub"),
     ]
     private_commands = [
         *default_commands,
@@ -370,6 +380,7 @@ def build_application(settings: Settings, *, request: BaseRequest | None = None)
     )
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("contribute", contribute))
     application.add_handler(CommandHandler("my_audio", my_audio))
     application.add_handler(CommandHandler("delete_audio", delete_audio))
     application.add_handler(
