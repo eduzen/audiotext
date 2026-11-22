@@ -22,6 +22,10 @@ dev = [
     "ty>=0.0.107",
 ]
 
+[tool.uv]
+# faster-whisper 1.2.1 passes metadata_errors to av.open(), removed in PyAV 19.
+constraint-dependencies = ["av<19"]
+
 [tool.ruff.lint]
 extend-select = ["UP"]
 

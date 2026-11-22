@@ -3,24 +3,14 @@
 from __future__ import annotations
 
 import logging
-import os
 from pathlib import Path
 from typing import Final, Self
 
 from faster_whisper import WhisperModel
 
+from audiotext.settings import Settings
+
 LOG: Final[logging.Logger] = logging.getLogger("audiotext.transcription")
-
-
-def _positive_int_setting(name: str, default: int) -> int:
-    raw_value: str | None = os.getenv(name)
-    try:
-        value: int = int(raw_value) if raw_value else default
-    except ValueError as error:
-        raise RuntimeError(f"{name} must be an integer") from error
-    if value < 1:
-        raise RuntimeError(f"{name} must be at least 1")
-    return value
 
 
 class Transcriber:
@@ -30,18 +20,19 @@ class Transcriber:
         self._model: WhisperModel = model
 
     @classmethod
-    def from_environment(cls) -> Self:
-        model_name: str = os.getenv("WHISPER_MODEL", "tiny")
-        device: str = os.getenv("WHISPER_DEVICE", "cpu")
-        compute_type: str = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
-        threads: int = _positive_int_setting("WHISPER_THREADS", 2)
-        LOG.info("Loading Whisper model %s (%s, %s)", model_name, device, compute_type)
+    def from_settings(cls, settings: Settings) -> Self:
+        LOG.info(
+            "Loading Whisper model %s (%s, %s)",
+            settings.whisper_model,
+            settings.whisper_device,
+            settings.whisper_compute_type,
+        )
         return cls(
             WhisperModel(
-                model_name,
-                device=device,
-                compute_type=compute_type,
-                cpu_threads=threads,
+                settings.whisper_model,
+                device=settings.whisper_device,
+                compute_type=settings.whisper_compute_type,
+                cpu_threads=settings.whisper_threads,
                 num_workers=1,
             )
         )

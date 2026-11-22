@@ -12,29 +12,24 @@ The default `tiny` Whisper model with CPU INT8 inference is intended for a CPU-o
 
 ## Install and run
 
-```sh
-uv sync --locked --python 3.14
-cp .env.example .env
-```
+From the repository root, run `just setup` if you have [just](https://just.systems/)
+installed. This installs the locked dependencies and creates `.env` only if it
+is missing. Set `BOT_TOKEN` in `.env`, then run `just run`.
 
-Set `BOT_TOKEN` in `.env`, then load the variables and run the bot:
-
-```sh
-set -a
-source .env
-set +a
-uv run python -m audiotext.bot
-```
-
-Or run the installed project command:
+Without `just`, run `uv sync --locked --python 3.14` and copy `.env.example` to
+`.env` if it does not already exist. Set `BOT_TOKEN`, then start the bot with:
 
 ```sh
-uv run audiotext
+uv run --locked --env-file .env audiotext
 ```
+
+You can also use `uv run --locked --env-file .env python -m audiotext.bot`.
+`src/` is the source directory, not the module name.
 
 ## Development checks
 
-Install the Git hook once, then run it against all files to check your setup:
+Run `just check` to run the same checks as CI. To install the Git hook locally
+and run it against all files:
 
 ```sh
 uv run --locked prek install
@@ -42,6 +37,21 @@ uv run --locked prek run --all-files
 ```
 
 On commit, prek runs Ruff (including its `UP` pyupgrade rules) and ty against the Python source. Both tools use the versions in `uv.lock`.
+
+## Integration test
+
+Run `just test` or:
+
+```sh
+uv run --locked python -m unittest discover -s tests -v
+```
+
+The test feeds a synthetic speech MP3 through the real Telegram application and
+local Whisper, with only the Telegram HTTP transport faked. It checks the reply
+and verifies that the downloaded MP3 is removed. No bot token is needed. The
+first run downloads the `tiny.en` Whisper model unless it is already cached.
+Set `AUDIOTEXT_TEST_MODEL` to a local faster-whisper model directory to run
+without network access after dependencies are installed.
 
 ## Use
 
