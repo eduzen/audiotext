@@ -216,7 +216,10 @@ async def _list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     message = update.message
     if message is None:
         return
-    users = await asyncio.to_thread(_history(context).list_users)
+    history = _history(context)
+    if await _remember_user(message, history) is None:
+        return
+    users = await asyncio.to_thread(history.list_users)
     lines = [f"Known users: {len(users)} (last seen in UTC)"]
     for user in users:
         name = " ".join(user.display_name.split())

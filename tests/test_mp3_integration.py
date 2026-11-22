@@ -342,6 +342,22 @@ class HistoryIntegrationTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(telegram.replies), message_id)
         return telegram.replies[-1]
 
+    async def test_users_records_owner_on_first_use(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            settings = _settings_for(Path(directory))
+            telegram = FakeTelegram()
+            with patch("audiotext.bot.Transcriber.from_settings"):
+                application = build_application(settings, request=telegram)
+
+            async with application:
+                for _ in range(2):
+                    reply = await self.command(
+                        application, telegram, "/users", chat=OWNER_CHAT, user_id=OWNER_ID
+                    )
+                    header, _, user_row = reply.partition("\n")
+                    self.assertEqual(header, "Known users: 1 (last seen in UTC)")
+                    self.assertRegex(user_row, rf"^Test — {OWNER_ID} — " r"\d{4}-\d{2}-\d{2}")
+
     async def test_only_owner_can_list_users_in_private(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             settings = _settings_for(Path(directory))
@@ -366,9 +382,8 @@ class HistoryIntegrationTest(unittest.IsolatedAsyncioTestCase):
                     application, telegram, "/users", chat=OWNER_CHAT, user_id=OWNER_ID
                 )
 
-            self.assertRegex(
-                reply, r"^Known users: 1 \(last seen in UTC\)\nUploader — 123 — \d{4}-\d{2}-\d{2}"
-            )
+            self.assertStartsWith(reply, "Known users: 2 (last seen in UTC)\n")
+            self.assertRegex(reply, r"\nUploader — 123 — \d{4}-\d{2}-\d{2}")
             self.assertNotIn("Private transcript", reply)
             self.assertNotIn("Sender", reply)
 

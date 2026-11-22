@@ -101,8 +101,9 @@ operator; it contains transcript text and personal data.
 
 Telegram user `3652654` (eduzen) can type `/users` in a private chat with the
 bot to see recorded users’ display names, Telegram IDs, and last-seen times
-(UTC). The command is not advertised in the `/` menu and does not show
-transcripts or count people who only appear as forwarded senders.
+(UTC). Running `/users` records or updates the owner before listing users.
+The command is not advertised in the `/` menu and does not show transcripts
+or count people who only appear as forwarded senders.
 
 ## Configuration
 
