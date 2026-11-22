@@ -6,7 +6,7 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final, TypeAlias, cast
+from typing import Final, cast
 
 from telegram import Audio, Document, Message, Update, Voice
 from telegram.constants import ChatAction
@@ -21,12 +21,22 @@ from telegram.ext import (
 from audiotext.transcription import Transcriber
 
 LOG: Final[logging.Logger] = logging.getLogger("audiotext.bot")
-AUDIO_EXTENSIONS: Final[frozenset[str]] = frozenset({
-    ".aac", ".flac", ".m4a", ".mp3", ".oga", ".ogg", ".opus",
-    ".wav", ".webm", ".wma",
-})
+AUDIO_EXTENSIONS: Final[frozenset[str]] = frozenset(
+    {
+        ".aac",
+        ".flac",
+        ".m4a",
+        ".mp3",
+        ".oga",
+        ".ogg",
+        ".opus",
+        ".wav",
+        ".webm",
+        ".wma",
+    }
+)
 MAX_TELEGRAM_MESSAGE: Final[int] = 4096
-TelegramAttachment: TypeAlias = Audio | Voice | Document
+type TelegramAttachment = Audio | Voice | Document
 
 
 @dataclass(slots=True)
@@ -35,14 +45,14 @@ class BotServices:
     transcription_semaphore: asyncio.Semaphore
 
 
-def _setting_int(name: str, default: int, *, minimum: int = 1) -> int:
-    raw: str | None = os.getenv(name)
+def _setting_int(name: str, default: int) -> int:
+    raw_value: str | None = os.getenv(name)
     try:
-        value: int = int(raw) if raw else default
+        value: int = int(raw_value) if raw_value else default
     except ValueError as error:
         raise RuntimeError(f"{name} must be an integer") from error
-    if value < minimum:
-        raise RuntimeError(f"{name} must be at least {minimum}")
+    if value < 1:
+        raise RuntimeError(f"{name} must be at least 1")
     return value
 
 
@@ -61,20 +71,20 @@ def _audio_attachment(message: Message) -> TelegramAttachment | None:
 
 
 def _temporary_suffix(attachment: TelegramAttachment) -> str:
-    suffix = Path(getattr(attachment, "file_name", "") or "").suffix.lower()
+    file_name: str | None = getattr(attachment, "file_name", None)
+    suffix: str = Path(file_name or "").suffix.lower()
     if suffix in AUDIO_EXTENSIONS:
         return suffix
-    mime = getattr(attachment, "mime_type", None) or ""
-    if mime == "audio/ogg":
-        return ".ogg"
-    if mime == "audio/mpeg":
-        return ".mp3"
-    if mime == "audio/mp4":
-        return ".m4a"
-    return ".audio"
+    suffix_by_mime_type: dict[str, str] = {
+        "audio/ogg": ".ogg",
+        "audio/mpeg": ".mp3",
+        "audio/mp4": ".m4a",
+    }
+    mime_type: str | None = attachment.mime_type
+    return suffix_by_mime_type.get(mime_type or "", ".audio")
 
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def start(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
         await update.message.reply_text(
             "Send me an audio file, Telegram voice message, or audio document. "
@@ -82,7 +92,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         )
 
 
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def help_command(update: Update, _context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.message:
         await update.message.reply_text(
             "Supported audio includes MP3, M4A, WAV, FLAC, OGG/Opus, AAC, "
@@ -101,7 +111,7 @@ async def _download_and_transcribe(update: Update, context: ContextTypes.DEFAULT
         return
 
     max_bytes = _setting_int("MAX_UPLOAD_MB", 20) * 1024 * 1024
-    size = getattr(attachment, "file_size", None)
+    size: int | None = attachment.file_size
     if size is not None and size > max_bytes:
         await message.reply_text(
             f"That file is over the {max_bytes // (1024 * 1024)} MB upload limit."
@@ -140,11 +150,8 @@ async def _download_and_transcribe(update: Update, context: ContextTypes.DEFAULT
             "Sorry, I couldn’t transcribe that audio. Please check that it is a valid audio file and try again."
         )
     finally:
-        if tmp_path:
-            try:
-                tmp_path.unlink()
-            except FileNotFoundError:
-                pass
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
 
 
 def _split_message(text: str, limit: int = MAX_TELEGRAM_MESSAGE) -> list[str]:
@@ -189,7 +196,8 @@ def main() -> None:
     application.bot_data["services"] = services
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
-    application.add_handler(MessageHandler(filters.AUDIO | filters.VOICE | filters.Document.ALL, _download_and_transcribe))
+    audio_filter = filters.AUDIO | filters.VOICE | filters.Document.ALL
+    application.add_handler(MessageHandler(audio_filter, _download_and_transcribe))
     application.add_error_handler(_on_error)
     LOG.info("AudioText bot is polling Telegram")
     application.run_polling(allowed_updates=Update.ALL_TYPES)

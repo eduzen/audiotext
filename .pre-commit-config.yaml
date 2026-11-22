@@ -1,0 +1,15 @@
+repos:
+  - repo: local
+    hooks:
+      - id: ruff
+        name: Ruff lint (including pyupgrade)
+        entry: uv run --locked ruff check src
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: ty
+        name: ty type check
+        entry: uv run --locked ty check src
+        language: system
+        pass_filenames: false
+        always_run: true

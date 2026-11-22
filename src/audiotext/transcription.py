@@ -36,14 +36,15 @@ class Transcriber:
         compute_type: str = os.getenv("WHISPER_COMPUTE_TYPE", "int8")
         threads: int = _positive_int_setting("WHISPER_THREADS", 2)
         LOG.info("Loading Whisper model %s (%s, %s)", model_name, device, compute_type)
-        model: WhisperModel = WhisperModel(
-            model_name,
-            device=device,
-            compute_type=compute_type,
-            cpu_threads=threads,
-            num_workers=1,
+        return cls(
+            WhisperModel(
+                model_name,
+                device=device,
+                compute_type=compute_type,
+                cpu_threads=threads,
+                num_workers=1,
+            )
         )
-        return cls(model)
 
     def transcribe(self, audio_path: Path) -> str:
         segments, _info = self._model.transcribe(

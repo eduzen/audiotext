@@ -7,12 +7,21 @@ name = "audiotext"
 version = "0.1.0"
 description = "Local Whisper transcription bot for Telegram audio messages"
 readme = "README.md"
-requires-python = ">=3.15"
+requires-python = "==3.14"
 dependencies = [
-    "faster-whisper>=1.2.1,<2",
-    "python-telegram-bot>=22.8,<23",
+    "faster-whisper>=1.2.1",
+    "python-telegram-bot>=22.8",
 ]
 
 [project.scripts]
 audiotext = "audiotext.bot:main"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.17.6",
+    "ty>=0.0.107",
+]
+
+[tool.ruff.lint]
+extend-select = ["UP"]
 

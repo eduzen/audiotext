@@ -6,14 +6,14 @@ The default `tiny` Whisper model with CPU INT8 inference is intended for a CPU-o
 
 ## Requirements
 
-- Python 3.15
+- [uv](https://docs.astral.sh/uv/) and Python 3.14 (ONNX Runtime does not yet provide wheels for Python 3.15)
 - A Telegram bot token from [@BotFather](https://t.me/BotFather)
 - Internet access for Telegram and the first model download
 
 ## Install and run
 
 ```sh
-uv sync --python 3.15
+uv sync --locked
 cp .env.example .env
 ```
 
@@ -23,7 +23,7 @@ Set `BOT_TOKEN` in `.env`, then load the variables and run the bot:
 set -a
 source .env
 set +a
-uv run python3.15 -m audiotext.bot
+uv run python -m audiotext.bot
 ```
 
 Or run the installed project command:
@@ -31,6 +31,17 @@ Or run the installed project command:
 ```sh
 uv run audiotext
 ```
+
+## Development checks
+
+Install the Git hook once, then run it against all files to check your setup:
+
+```sh
+uv run --locked prek install
+uv run --locked prek run --all-files
+```
+
+On commit, prek runs Ruff (including its `UP` pyupgrade rules) and ty against the Python source. Both tools use the versions in `uv.lock`.
 
 ## Use
 
