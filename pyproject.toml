@@ -1,0 +1,18 @@
+[build-system]
+requires = ["uv_build>=0.13.9,<0.14.0"]
+build-backend = "uv_build"
+
+[project]
+name = "audiotext"
+version = "0.1.0"
+description = "Local Whisper transcription bot for Telegram audio messages"
+readme = "README.md"
+requires-python = ">=3.15"
+dependencies = [
+    "faster-whisper>=1.2.1,<2",
+    "python-telegram-bot>=22.8,<23",
+]
+
+[project.scripts]
+audiotext = "audiotext.bot:main"
+
