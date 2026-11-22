@@ -6,14 +6,14 @@ The default `tiny` Whisper model with CPU INT8 inference is intended for a CPU-o
 
 ## Requirements
 
-- [uv](https://docs.astral.sh/uv/) and Python 3.14 (ONNX Runtime does not yet provide wheels for Python 3.15)
+- [uv](https://docs.astral.sh/uv/) and Python 3.14.x
 - A Telegram bot token from [@BotFather](https://t.me/BotFather)
 - Internet access for Telegram and the first model download
 
 ## Install and run
 
 ```sh
-uv sync --locked
+uv sync --locked --python 3.14
 cp .env.example .env
 ```
 
