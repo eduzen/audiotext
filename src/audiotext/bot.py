@@ -8,6 +8,8 @@ from typing import Final, cast
 
 from telegram import (
     Audio,
+    BotCommand,
+    BotCommandScopeAllPrivateChats,
     Document,
     Message,
     MessageOriginHiddenUser,
@@ -17,6 +19,7 @@ from telegram import (
     Voice,
 )
 from telegram.constants import ChatAction, ChatType
+from telegram.error import TelegramError
 from telegram.ext import (
     Application,
     CommandHandler,
@@ -48,6 +51,7 @@ AUDIO_EXTENSIONS: Final[frozenset[str]] = frozenset(
     }
 )
 MAX_TELEGRAM_MESSAGE: Final[int] = 4096
+OWNER_TELEGRAM_ID: Final[int] = 3652654  # eduzen
 type TelegramAttachment = Audio | Voice | Document
 
 
@@ -208,6 +212,18 @@ async def delete_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await message.reply_text("Saved transcript deleted." if deleted else "No saved audio with that ID.")
 
 
+async def _list_users(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    message = update.message
+    if message is None:
+        return
+    users = await asyncio.to_thread(_history(context).list_users)
+    lines = [f"Known users: {len(users)} (last seen in UTC)"]
+    for user in users:
+        name = " ".join(user.display_name.split())
+        lines.append(f"{name} — {user.telegram_id} — {user.last_seen_at}")
+    await _reply_in_chunks(message, "\n".join(lines))
+
+
 async def _handle_audio_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if message is None or message.sender_chat is not None:
@@ -321,8 +337,25 @@ async def _on_error(_update: object, context: ContextTypes.DEFAULT_TYPE) -> None
         LOG.error("Unhandled Telegram update error: no exception details provided")
 
 
+async def _sync_command_menu(application: Application) -> None:
+    default_commands = [
+        BotCommand("start", "Learn how to transcribe audio"),
+        BotCommand("help", "See supported formats and upload limits"),
+    ]
+    private_commands = [
+        *default_commands,
+        BotCommand("my_audio", "View your saved transcripts"),
+        BotCommand("delete_audio", "Delete a saved transcript by ID"),
+    ]
+    try:
+        await application.bot.set_my_commands(default_commands)
+        await application.bot.set_my_commands(private_commands, scope=BotCommandScopeAllPrivateChats())
+    except TelegramError as error:
+        LOG.warning("Could not sync Telegram command menus (%s)", type(error).__name__)
+
+
 def build_application(settings: Settings, *, request: BaseRequest | None = None) -> Application:
-    builder = Application.builder().token(settings.bot_token)
+    builder = Application.builder().token(settings.bot_token).post_init(_sync_command_menu)
     if request is not None:
         builder.request(request).get_updates_request(request)
     application = builder.build()
@@ -336,6 +369,13 @@ def build_application(settings: Settings, *, request: BaseRequest | None = None)
     application.add_handler(CommandHandler("help", help_command))
     application.add_handler(CommandHandler("my_audio", my_audio))
     application.add_handler(CommandHandler("delete_audio", delete_audio))
+    application.add_handler(
+        CommandHandler(
+            "users",
+            _list_users,
+            filters=filters.ChatType.PRIVATE & filters.User(user_id=OWNER_TELEGRAM_ID),
+        )
+    )
     audio_filter = filters.UpdateType.MESSAGE & (filters.AUDIO | filters.VOICE | filters.Document.ALL)
     application.add_handler(MessageHandler(audio_filter, _handle_audio_upload))
     application.add_error_handler(_on_error)

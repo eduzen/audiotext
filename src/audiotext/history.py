@@ -11,6 +11,12 @@ from typing import Final, NamedTuple
 HISTORY_PAGE_SIZE: Final[int] = 10
 
 
+class UserSummary(NamedTuple):
+    telegram_id: int
+    display_name: str
+    last_seen_at: str
+
+
 class AudioSummary(NamedTuple):
     audio_id: int
     created_at: str
@@ -63,6 +69,16 @@ class History:
                 """,
                 (user_id, display_name),
             )
+
+    def list_users(self) -> list[UserSummary]:
+        with self._connect() as db:
+            rows = db.execute(
+                """
+                SELECT telegram_id, display_name, last_seen_at FROM users
+                ORDER BY last_seen_at DESC, telegram_id
+                """
+            )
+            return [UserSummary(*row) for row in rows]
 
     def save_audio(
         self,

@@ -25,7 +25,9 @@ BOT_USER = {"id": 42, "is_bot": True, "first_name": "AudioText", "username": "au
 CHAT = {"id": 123, "type": "private"}
 OTHER_CHAT = {"id": 456, "type": "private"}
 GROUP_CHAT = {"id": -789, "type": "group", "title": "Test group"}
-CHATS = {chat["id"]: chat for chat in (CHAT, OTHER_CHAT, GROUP_CHAT)}
+OWNER_ID = 3652654
+OWNER_CHAT = {"id": OWNER_ID, "type": "private"}
+CHATS = {chat["id"]: chat for chat in (CHAT, OTHER_CHAT, GROUP_CHAT, OWNER_CHAT)}
 AUDIO = {
     "file_id": "test-audio",
     "file_unique_id": "test-audio-unique",
@@ -40,6 +42,7 @@ class FakeTelegram(BaseRequest):
     def __init__(self) -> None:
         self.calls: list[tuple[str, str]] = []
         self.replies: list[str] = []
+        self.command_menus: dict[str, list[str]] = {}
 
     @property
     def read_timeout(self) -> None:
@@ -68,6 +71,10 @@ class FakeTelegram(BaseRequest):
         match call:
             case ("POST", "getMe"):
                 result = BOT_USER
+            case ("POST", "setMyCommands"):
+                scope = params.get("scope", {"type": "default"})["type"]
+                self.command_menus[scope] = [command["command"] for command in params["commands"]]
+                result = True
             case ("POST", "sendMessage") if params.get("chat_id") in CHATS:
                 text = str(params["text"])
                 self.replies.append(text)
@@ -112,6 +119,26 @@ async def _running_application(application: Application) -> AsyncIterator[None]:
         yield
     finally:
         await application.stop()
+
+
+class CommandMenuTest(unittest.IsolatedAsyncioTestCase):
+    async def test_startup_replaces_default_and_private_command_menus(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            telegram = FakeTelegram()
+            telegram.command_menus = {"default": ["old"], "all_private_chats": ["old"]}
+            with patch("audiotext.bot.Transcriber.from_settings"):
+                application = build_application(_settings_for(Path(directory)), request=telegram)
+            async with application:
+                assert application.post_init is not None
+                await application.post_init(application)
+
+        self.assertEqual(
+            telegram.command_menus,
+            {
+                "default": ["start", "help"],
+                "all_private_chats": ["start", "help", "my_audio", "delete_audio"],
+            },
+        )
 
 
 class Mp3IntegrationTest(unittest.IsolatedAsyncioTestCase):
@@ -288,6 +315,7 @@ class HistoryIntegrationTest(unittest.IsolatedAsyncioTestCase):
         *,
         chat: dict[str, int | str] = CHAT,
         user_id: int = 123,
+        expect_reply: bool = True,
     ) -> str:
         message_id = len(telegram.replies) + 1
         update = Update.de_json(
@@ -308,8 +336,41 @@ class HistoryIntegrationTest(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIsNotNone(update)
         await application.process_update(update)
+        if not expect_reply:
+            self.assertEqual(len(telegram.replies), message_id - 1)
+            return ""
         self.assertEqual(len(telegram.replies), message_id)
         return telegram.replies[-1]
+
+    async def test_only_owner_can_list_users_in_private(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            settings = _settings_for(Path(directory))
+            history = History(settings.database_path)
+            history.remember_user(123, "Uploader")
+            history.save_audio(123, "Private transcript", sender_id=456, sender_name="Sender")
+            telegram = FakeTelegram()
+            with patch("audiotext.bot.Transcriber.from_settings"):
+                application = build_application(settings, request=telegram)
+
+            async with application:
+                await self.command(application, telegram, "/users", expect_reply=False)
+                await self.command(
+                    application,
+                    telegram,
+                    "/users",
+                    chat=GROUP_CHAT,
+                    user_id=OWNER_ID,
+                    expect_reply=False,
+                )
+                reply = await self.command(
+                    application, telegram, "/users", chat=OWNER_CHAT, user_id=OWNER_ID
+                )
+
+            self.assertRegex(
+                reply, r"^Known users: 1 \(last seen in UTC\)\nUploader — 123 — \d{4}-\d{2}-\d{2}"
+            )
+            self.assertNotIn("Private transcript", reply)
+            self.assertNotIn("Sender", reply)
 
     async def test_only_uploader_can_list_read_and_delete_in_private(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

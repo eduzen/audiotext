@@ -70,6 +70,12 @@ set `ALLOWED_TELEGRAM_USER_IDS` to a comma-separated list of trusted Telegram
 user IDs. This restricts who can submit audio; it doesn’t change access to
 existing private transcript history.
 
+On startup, the bot updates Telegram’s `/` menu with `/start` and `/help`, plus
+`/my_audio` and `/delete_audio` in private chats. If old commands remain after
+restarting the bot and reopening the chat, check for previously configured
+chat-specific or language-specific command lists. Telegram may show those
+instead of the menus the bot updates.
+
 ## Transcript history
 
 The bot records the Telegram ID, display name, and first- and last-seen times
@@ -90,6 +96,13 @@ In a private chat with the bot:
 Deleting an entry does not delete Telegram messages or copies in backups.
 Keep the SQLite database on a persistent volume accessible only to the bot
 operator; it contains transcript text and personal data.
+
+## Owner command
+
+Telegram user `3652654` (eduzen) can type `/users` in a private chat with the
+bot to see recorded users’ display names, Telegram IDs, and last-seen times
+(UTC). The command is not advertised in the `/` menu and does not show
+transcripts or count people who only appear as forwarded senders.
 
 ## Configuration
 
