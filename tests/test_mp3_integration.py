@@ -5,7 +5,8 @@ import re
 import sqlite3
 import tempfile
 import unittest
-from contextlib import closing
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager, closing
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
@@ -104,6 +105,15 @@ def _settings_for(directory: Path) -> Settings:
     )
 
 
+@asynccontextmanager
+async def _running_application(application: Application) -> AsyncIterator[None]:
+    await application.start()
+    try:
+        yield
+    finally:
+        await application.stop()
+
+
 class Mp3IntegrationTest(unittest.IsolatedAsyncioTestCase):
     async def test_direct_audio_and_forwarded_voices_return_transcripts_and_remove_downloads(
         self,
@@ -165,11 +175,8 @@ class Mp3IntegrationTest(unittest.IsolatedAsyncioTestCase):
                             application.bot,
                         )
                         self.assertIsNotNone(update)
-                        await application.start()
-                        try:
+                        async with _running_application(application):
                             await application.process_update(update)
-                        finally:
-                            await application.stop()
 
                         self.assertEqual(
                             telegram.calls,
@@ -246,30 +253,28 @@ class AudioAdmissionIntegrationTest(unittest.IsolatedAsyncioTestCase):
 
             async with application:
                 with patch("audiotext.bot.TranscriptionService.transcribe", side_effect=transcribe):
-                    await application.start()
-                    try:
-                        await send(123, is_bot=True, message_id=1)
-                        await send(999, message_id=2)
-                        self.assertEqual(telegram.calls, [("POST", "getMe")])
+                    async with _running_application(application):
+                        try:
+                            await send(123, is_bot=True, message_id=1)
+                            await send(999, message_id=2)
+                            self.assertEqual(telegram.calls, [("POST", "getMe")])
 
-                        await send(123, message_id=3)
-                        await asyncio.wait_for(started.wait(), timeout=5)
-                        self.assertEqual(telegram.replies, ["Audio received. Transcribing locally…"])
-                        await send(123, message_id=4)
-                        self.assertIn("per-minute transcription limit (1)", telegram.replies[-1])
-                        await send(456, message_id=5)
-                        self.assertIn("transcribing another file", telegram.replies[-1])
-                        self.assertEqual(telegram.calls.count(("POST", "getFile")), 1)
-                    finally:
-                        finish.set()
-                        await application.stop()
+                            await send(123, message_id=3)
+                            await asyncio.wait_for(started.wait(), timeout=5)
+                            self.assertEqual(
+                                telegram.replies, ["Audio received. Transcribing locally…"]
+                            )
+                            await send(123, message_id=4)
+                            self.assertIn("per-minute transcription limit (1)", telegram.replies[-1])
+                            await send(456, message_id=5)
+                            self.assertIn("transcribing another file", telegram.replies[-1])
+                            self.assertEqual(telegram.calls.count(("POST", "getFile")), 1)
+                        finally:
+                            finish.set()
                     self.assertEqual(telegram.replies[-1], "Transcript")
 
-                    await application.start()
-                    try:
+                    async with _running_application(application):
                         await send(456, message_id=6)
-                    finally:
-                        await application.stop()
                     self.assertEqual(telegram.calls.count(("POST", "getFile")), 2)
                     self.assertEqual(telegram.replies[-1], "Transcript")
 

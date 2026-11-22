@@ -5,6 +5,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Final
+
+DEFAULT_TRANSCRIPTIONS_PER_MINUTE: Final = 3
 
 
 def _positive_int(name: str, default: int) -> int:
@@ -42,7 +45,7 @@ class Settings:
     whisper_compute_type: str
     whisper_threads: int
     database_path: Path
-    transcriptions_per_minute: int = 3
+    transcriptions_per_minute: int = DEFAULT_TRANSCRIPTIONS_PER_MINUTE
     allowed_telegram_user_ids: frozenset[int] = frozenset()
 
     @classmethod
@@ -62,6 +65,8 @@ class Settings:
             whisper_compute_type=os.getenv("WHISPER_COMPUTE_TYPE", "int8"),
             whisper_threads=_positive_int("WHISPER_THREADS", 2),
             database_path=Path(os.getenv("DATABASE_PATH") or "data/audiotext.sqlite3"),
-            transcriptions_per_minute=_positive_int("TRANSCRIPTIONS_PER_MINUTE", 3),
+            transcriptions_per_minute=_positive_int(
+                "TRANSCRIPTIONS_PER_MINUTE", DEFAULT_TRANSCRIPTIONS_PER_MINUTE
+            ),
             allowed_telegram_user_ids=_allowed_user_ids(),
         )

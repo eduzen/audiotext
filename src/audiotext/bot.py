@@ -208,7 +208,7 @@ async def delete_audio(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
     await message.reply_text("Saved transcript deleted." if deleted else "No saved audio with that ID.")
 
 
-async def _download_and_transcribe(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def _handle_audio_upload(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     message = update.effective_message
     if message is None or message.sender_chat is not None:
         return
@@ -217,7 +217,8 @@ async def _download_and_transcribe(update: Update, context: ContextTypes.DEFAULT
         return
 
     settings = cast(Settings, context.application.bot_data["settings"])
-    if settings.allowed_telegram_user_ids and user.id not in settings.allowed_telegram_user_ids:
+    allowed_users = settings.allowed_telegram_user_ids
+    if allowed_users and user.id not in allowed_users:
         return
 
     attachment = _audio_attachment(message)
@@ -336,7 +337,7 @@ def build_application(settings: Settings, *, request: BaseRequest | None = None)
     application.add_handler(CommandHandler("my_audio", my_audio))
     application.add_handler(CommandHandler("delete_audio", delete_audio))
     audio_filter = filters.UpdateType.MESSAGE & (filters.AUDIO | filters.VOICE | filters.Document.ALL)
-    application.add_handler(MessageHandler(audio_filter, _download_and_transcribe))
+    application.add_handler(MessageHandler(audio_filter, _handle_audio_upload))
     application.add_error_handler(_on_error)
     return application
 
