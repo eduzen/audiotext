@@ -47,9 +47,10 @@ uv run --locked python -m unittest discover -s tests -v
 ```
 
 The test feeds a synthetic speech MP3 through the real Telegram application and
-local Whisper, with only the Telegram HTTP transport faked. It checks the reply
-and verifies that the downloaded MP3 is removed. No bot token is needed. The
-first run downloads the `tiny.en` Whisper model unless it is already cached.
+local Whisper, with only the Telegram HTTP transport faked. It checks direct
+and forwarded audio replies, verifies that the download is removed, and tests
+private history access and deletion. No bot token is needed. The first run downloads the `tiny.en` Whisper model unless it
+is already cached.
 Set `AUDIOTEXT_TEST_MODEL` to a local faster-whisper model directory to run
 without network access after dependencies are installed.
 
@@ -57,7 +58,38 @@ without network access after dependencies are installed.
 
 Send the bot a Telegram voice message, audio attachment, or audio document. It accepts common formats including MP3, M4A, WAV, FLAC, OGG/Opus, AAC, WebM, and WMA. The default upload limit is 20 MB, matching the hosted Telegram Bot API download limit. Transcriptions longer than Telegram's message limit are sent in multiple replies.
 
-The model loads when the bot starts. Only one transcription runs at a time to keep memory use predictable. Files are kept in the system temporary directory and removed after processing, including when transcription fails.
+When you forward audio, the transcript starts with the original sender's name if Telegram provides it, for example `Alex Rivera: Hello there.` Direct uploads and forwards without a person’s name are transcribed without a prefix.
+
+The model loads when the bot starts. The bot replies “Audio received. Transcribing locally…” before downloading an accepted upload. It processes one upload at a time across all users. If it’s busy, it asks you to resend rather than queueing audio. Files are kept in the system temporary directory and removed after processing, including when transcription fails.
+
+Each Telegram user can start up to three transcriptions per rolling minute by
+default. Busy rejections don’t count. The limit resets when the process restarts.
+The bot ignores audio submitted by Telegram bot accounts or on behalf of chats.
+Automated regular accounts can still look like people, so for a private bot,
+set `ALLOWED_TELEGRAM_USER_IDS` to a comma-separated list of trusted Telegram
+user IDs. This restricts who can submit audio; it doesn’t change access to
+existing private transcript history.
+
+## Transcript history
+
+The bot records the Telegram ID, display name, and first- and last-seen times
+of people who use it. Successful transcriptions are saved in SQLite along with
+the time they were saved and any original sender name and user ID Telegram provides for
+forwarded audio. The uploader owns the history entry; the original sender does
+not gain access. Audio files are not kept.
+
+In a private chat with the bot:
+
+| Command | Action |
+| --- | --- |
+| `/my_audio` | List your 10 most recent saved transcripts. |
+| `/my_audio before ID` | List the next page of older transcripts. |
+| `/my_audio ID` | Open one of your saved transcripts. |
+| `/delete_audio ID` | Delete one of your saved transcripts from history. |
+
+Deleting an entry does not delete Telegram messages or copies in backups.
+Keep the SQLite database on a persistent volume accessible only to the bot
+operator; it contains transcript text and personal data.
 
 ## Configuration
 
@@ -71,7 +103,10 @@ Copy `.env.example` to `.env` and configure:
 | `WHISPER_COMPUTE_TYPE` | `int8` | CPU quantization mode |
 | `WHISPER_THREADS` | `2` | CPU inference threads |
 | `MAX_UPLOAD_MB` | `20` | Maximum accepted attachment size |
+| `TRANSCRIPTIONS_PER_MINUTE` | `3` | Maximum accepted uploads per Telegram user in a rolling minute |
+| `ALLOWED_TELEGRAM_USER_IDS` | unset | Optional comma-separated IDs allowed to submit audio |
 | `TEMP_DIR` | system temp | Optional directory for temporary audio |
 | `LOG_LEVEL` | `INFO` | Python logging level |
+| `DATABASE_PATH` | `data/audiotext.sqlite3` | SQLite database file for users and transcript history |
 
 For a 4 GB VM, keep `tiny`, `cpu`, and `int8`. Larger models can need substantially more memory. Telegram's hosted Bot API limits file downloads; the 20 MB default cannot be raised unless you run a local Telegram Bot API server and adapt deployment/configuration accordingly.

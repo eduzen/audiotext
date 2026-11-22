@@ -18,6 +18,19 @@ def _positive_int(name: str, default: int) -> int:
     return value
 
 
+def _allowed_user_ids() -> frozenset[int]:
+    raw_value = os.getenv("ALLOWED_TELEGRAM_USER_IDS", "").strip()
+    if not raw_value:
+        return frozenset()
+    try:
+        user_ids = frozenset(int(value) for value in raw_value.split(","))
+        if any(user_id <= 0 for user_id in user_ids):
+            raise ValueError("Telegram user IDs must be positive")
+    except ValueError as error:
+        raise RuntimeError("ALLOWED_TELEGRAM_USER_IDS must be comma-separated positive IDs") from error
+    return user_ids
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     bot_token: str
@@ -28,6 +41,9 @@ class Settings:
     whisper_device: str
     whisper_compute_type: str
     whisper_threads: int
+    database_path: Path
+    transcriptions_per_minute: int = 3
+    allowed_telegram_user_ids: frozenset[int] = frozenset()
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -45,4 +61,7 @@ class Settings:
             whisper_device=os.getenv("WHISPER_DEVICE", "cpu"),
             whisper_compute_type=os.getenv("WHISPER_COMPUTE_TYPE", "int8"),
             whisper_threads=_positive_int("WHISPER_THREADS", 2),
+            database_path=Path(os.getenv("DATABASE_PATH") or "data/audiotext.sqlite3"),
+            transcriptions_per_minute=_positive_int("TRANSCRIPTIONS_PER_MINUTE", 3),
+            allowed_telegram_user_ids=_allowed_user_ids(),
         )
